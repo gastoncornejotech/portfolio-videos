@@ -345,6 +345,20 @@ html.light-theme .filter-btn.active { color: #ffffff; }
 .custom-video-wrap iframe {
   width: 100%; height: 100%; border: 0; object-fit: cover; display: block;
 }
+.video-status-overlay {
+  position: absolute; inset: 0; z-index: 7;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(10, 8, 3, 0.72); color: var(--ink); font-size: 0.82rem;
+  text-align: center; padding: 16px; pointer-events: none;
+}
+.video-status-overlay.hidden { display: none; }
+.video-spinner {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 2.5px solid rgba(255, 215, 0, 0.25);
+  border-top-color: var(--gold);
+  animation: gcSpin 0.8s linear infinite;
+}
+@keyframes gcSpin { to { transform: rotate(360deg); } }
 
 .custom-controls {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 8;
@@ -945,7 +959,8 @@ html.light-theme .wa-cta-btn { color: #ffffff; }
     if(r2Src) {
       if(!wrap.querySelector("video")) {
         wrap.innerHTML =
-          '<video playsinline preload="metadata" src="' + r2Src + '"></video>' +
+          '<video playsinline webkit-playsinline="true" preload="auto" src="' + r2Src + '"></video>' +
+          '<div class="video-status-overlay js-status"><div class="video-spinner"></div><span>Cargando video...</span></div>' +
           '<div class="custom-controls">' +
             '<div class="custom-progress-track"><div class="custom-progress-fill"></div></div>' +
             '<div class="custom-ctrl-row">' +
@@ -959,6 +974,7 @@ html.light-theme .wa-cta-btn { color: #ffffff; }
           '</div>';
 
         var vid = wrap.querySelector("video");
+        var statusEl = wrap.querySelector(".js-status");
         var ppBtn = wrap.querySelector(".js-pp");
         var muteBtn = wrap.querySelector(".js-mute");
         var fsBtn = wrap.querySelector(".js-fs");
@@ -971,13 +987,42 @@ html.light-theme .wa-cta-btn { color: #ffffff; }
             ? '<svg class="gc-icon sm"><use href="#gc-icon-play"></use></svg>'
             : '<svg class="gc-icon sm"><use href="#gc-icon-pause"></use></svg>';
         }
+        function safePlay() {
+          var p = vid.play();
+          if(p && typeof p.catch === "function") {
+            p.catch(function(){
+              syncPlayIcon();
+              if(statusEl) statusEl.classList.add("hidden");
+            });
+          }
+        }
+        vid.addEventListener("waiting", function(){
+          if(statusEl) {
+            statusEl.innerHTML = '<div class="video-spinner"></div><span>Cargando video...</span>';
+            statusEl.classList.remove("hidden");
+          }
+        });
+        vid.addEventListener("playing", function(){
+          if(statusEl) statusEl.classList.add("hidden");
+          syncPlayIcon();
+        });
+        vid.addEventListener("canplay", function(){
+          if(statusEl && !vid.paused) statusEl.classList.add("hidden");
+        });
+        vid.addEventListener("error", function(){
+          if(statusEl) {
+            statusEl.innerHTML = '<span>No se pudo cargar el video. Tocá para reintentar.</span>';
+            statusEl.classList.remove("hidden");
+          }
+          syncPlayIcon();
+        });
         vid.addEventListener("click", function(){
-          if(vid.paused) vid.play(); else vid.pause();
+          if(vid.paused) safePlay(); else vid.pause();
           syncPlayIcon();
         });
         ppBtn.addEventListener("click", function(e){
           e.stopPropagation();
-          if(vid.paused) vid.play(); else vid.pause();
+          if(vid.paused) safePlay(); else vid.pause();
           syncPlayIcon();
         });
         muteBtn.addEventListener("click", function(e){
@@ -1006,7 +1051,10 @@ html.light-theme .wa-cta-btn { color: #ffffff; }
         vid.addEventListener("ended", syncPlayIcon);
       }
       var activeVid = wrap.querySelector("video");
-      if(activeVid) activeVid.play();
+      if(activeVid) {
+        var ap = activeVid.play();
+        if(ap && typeof ap.catch === "function") ap.catch(function(){});
+      }
     } else {
       wrap.innerHTML = '<iframe src="' + getPreviewUrl(v.id) + '" allow="autoplay; fullscreen" allowfullscreen title="' + v.title.replace(/"/g, "") + '"></iframe>';
     }
@@ -1019,7 +1067,7 @@ html.light-theme .wa-cta-btn { color: #ffffff; }
       return (
         '<article class="carousel-card' + (v.isLandscape ? ' is-landscape' : '') + (idx === 0 ? ' is-active' : '') + '" data-idx="' + idx + '">' +
           '<div class="slide-media">' +
-            '<img class="slide-thumb" src="' + getThumbUrl(v.id) + '" alt="' + v.title.replace(/"/g, "") + '" loading="lazy">' +
+            '<img class="slide-thumb" src="' + getThumbUrl(v.id) + '" alt="' + v.title.replace(/"/g, "") + '" loading="lazy" onerror="this.style.display=\'none\'">' +
             '<div class="slide-gradient"></div>' +
             '<div class="slide-top-badges">' +
               '<span class="rank-badge">#' + v.num + '</span>' +
