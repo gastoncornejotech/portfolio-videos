@@ -857,8 +857,7 @@ html.light-theme .wa-cta-btn { color: #ffffff; }
     return PROTO + "drive.google.com/file/d/" + id + "/preview";
   }
   function getR2Url(file) {
-    if(!R2_BASE_URL) return "";
-    return R2_BASE_URL.replace(/\/+$/, "") + "/" + file;
+    return "/api/video?file=" + encodeURIComponent(file);
   }
 
   function formatSec(sec) {
